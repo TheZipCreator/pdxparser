@@ -174,10 +174,15 @@ Block parse(string script, int* l) {
       }
     }
     // TODO: maybe add date as a type? (e.g. 1444.4.4 would return a custom struct Date or something)
+    // TODO: "yes" and "no" still get converted to bools when surrounded by quotes, fix
     if(number && dot)
       return cast(Variant)(value.to!float);
     else if(number)
       return cast(Variant)(value.to!int);
+    else if(value == "yes")
+      return cast(Variant)true;
+    else if(value == "no")
+      return cast(Variant)false;
     else
       return cast(Variant)(value);
   }
