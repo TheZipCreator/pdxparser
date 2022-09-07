@@ -43,11 +43,16 @@ enum NodeType {
 
 /// Represents a single usable thing in the given script
 interface Node {
-  Node[] children(); /// Gets all children of a block
-  NodeType type(); /// Returns a `NodeType` that corresponds to the type
-  Node opIndex(size_t i); /// Should be equivalent to `node.children[i]`
-  int opApply(int delegate(Node) dg); /// equivalent to looping over node.children
-  string key(); /// Gets the key of an assignment
+  /// Gets all children of a block
+  Node[] children();
+  /// Returns a `NodeType` that corresponds to the type
+  NodeType type(); 
+  /// Should be equivalent to `node.children[i]`
+  Node opIndex(size_t i);
+  /// equivalent to looping over node.children
+  int opApply(int delegate(Node) dg);
+  /// Gets the key of an assignment
+  string key(); 
   Variant value_(); // for some reason (seriously why the f**k did they do this) template functions in interfaces are final by default. So I have to do this instead
   /// Gets the value of an assignment or the value of a value
   T value(T)() {
@@ -236,6 +241,11 @@ Block parse(string script, int* l) {
         ret ~= parse(script, l);
         break;
       case '}':
+        if(seenSpace) {
+          ret ~= new Value(get);
+          value = c.to!string;
+          seenSpace = false;
+        }
         return new Block(ret);
       case '#':
         while(script[*l] != '\n')
@@ -305,6 +315,9 @@ capital = 4175 # Lezhe
 unittest {
   string valueTest = `values = { 1 1 1 }`;
   auto res = parse(valueTest);
+  import std.stdio;
+  writeln(res[0].block);
+  assert(res[0].block.children.length == 3);
   foreach(v; res[0].block) {
     assert(v.value!int == 1);
   }
