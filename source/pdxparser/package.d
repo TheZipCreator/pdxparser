@@ -49,6 +49,8 @@ interface Node {
   NodeType type(); 
   /// Should be equivalent to `node.children[i]`
   Node opIndex(size_t i);
+  /// Returns the first assignment with key `s`
+  Node opIndex(string s);
   /// equivalent to looping over node.children
   int opApply(int delegate(Node) dg);
   /// Gets the key of an assignment
@@ -85,6 +87,9 @@ class Assignment : Node {
   Node opIndex(size_t i) {
     throw new PDXInvalidTypeException;
   }
+  Node opIndex(string s) {
+    throw new PDXInvalidTypeException;
+  }
   int opApply(int delegate(Node) dg) {
     throw new PDXInvalidTypeException;
   }
@@ -115,7 +120,16 @@ class Block : Node {
   Node opIndex(size_t i) {
     return _children[i];
   }
+  Node opIndex(string s) {
+    foreach(child; _children) {
+      if(child.type == NodeType.ASSIGNMENT && child.key == s)
+        return child;
+    }
+    import core.exception : RangeError;
+    throw new RangeError("Cannot find key \""~s~"\"");
+  }
   int opApply(int delegate(Node) dg) {
+    // TODO: this is broken with returns
     foreach(ref Node child; _children) {
       if(dg(child))
         return 1;
@@ -156,6 +170,9 @@ class Value : Node {
     throw new PDXInvalidTypeException;
   }
   int opApply(int delegate(Node) dg) {
+    throw new PDXInvalidTypeException;
+  }
+  Node opIndex(string s) {
     throw new PDXInvalidTypeException;
   }
   string key() {
@@ -278,6 +295,20 @@ Block parse(string script, int* l) {
   }
 }
 
+/// Takes a filename, and parses a script from that file. Supported encodings are UTF-8 and ANSI
+Node parseFromFile(string filename) {
+  import std.file, std.encoding;
+  import core.exception : UnicodeException;
+  // Paradox script files are sometimes UTF-8 and sometimes ANSI, so I have to handle both here
+  try {
+    return parse(readText(filename));
+  } catch(UnicodeException e) {
+    string s;
+    transcode(cast(Latin1String)read(filename), s);
+    return parse(s);
+  }
+}
+
 unittest {
   string albania = `government = monarchy
 add_government_reform = autocracy_reform
@@ -315,10 +346,51 @@ capital = 4175 # Lezhe
 unittest {
   string valueTest = `values = { 1 1 1 }`;
   auto res = parse(valueTest);
-  import std.stdio;
-  writeln(res[0].block);
   assert(res[0].block.children.length == 3);
   foreach(v; res[0].block) {
     assert(v.value!int == 1);
   }
+}
+
+unittest {
+  string utf8file = `a = b`;
+  import std.file, std.encoding;
+  write("tmp.txt", utf8file);
+  auto res = parseFromFile("tmp.txt");
+  assert(res[0].key == "a");
+  assert(res[0].value!string == "b");
+  Latin1String ansifile;
+  transcode(utf8file, ansifile);
+  write("tmp.txt", ansifile);
+  res = parseFromFile("tmp.txt");
+  assert(res[0].key == "a");
+  assert(res[0].value!string == "b");
+  remove("tmp.txt");
+}
+
+unittest {
+  string file = `# The Kingdom of God on Earth
+country_event = {
+	id = catholic_flavor.2
+	title = catholic_flavor.2.t
+	desc = catholic_flavor.2.d
+	picture = POPE_PREACHING_eventPicture
+	
+	major = yes
+	is_triggered_only = yes
+
+	option = {
+		name = catholic_flavor.2.a
+		add_government_reform = kingdom_of_god_reform
+		#set_government_rank = 3
+	}
+
+	option = {
+		name = catholic_flavor.2.b
+		add_prestige = 10
+	}
+}`; // From EU4: events/Catholic.txt
+  auto tree = parse(file);
+  assert(tree.children.length == 1);
+  assert(tree[0].block["id"].value!string == "catholic_flavor.2");
 }
