@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/pdxparser
+pdxparser.so
+pdxparser.dylib
+pdxparser.dll
+pdxparser.a
+pdxparser.lib
+pdxparser-test-*
+*.exe
+*.o
+*.obj
+*.lst
+*.pdb

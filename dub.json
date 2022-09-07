@@ -1,0 +1,9 @@
+{
+	"authors": [
+		"TheZipCreator"
+	],
+	"copyright": "Copyright © 2022, TheZipCreator",
+	"description": "Parser for paradox interactive's scripting engine found in their games",
+	"license": "GNU General Public License v3",
+	"name": "pdxparser"
+}
