@@ -1,5 +1,5 @@
 # Parser for the Paradox/Clausewitz Scripting language
-This is a simple library that parses the scripting language found in clausewitz engine games. The `parse` function returns a `Node` object, which can then be iterated over. Here's an example usage:
+This is a simple library for the D language that parses the scripting language found in clausewitz engine games. The `parse` function returns a `Node` object, which can then be iterated over. Here's an example usage:
 ```d
 import pdxparser, std.stdio;
 
