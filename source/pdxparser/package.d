@@ -51,7 +51,8 @@ interface Node {
   Node opIndex(size_t i);
   /// Returns the first assignment with key `s`
   Node opIndex(string s);
-  /// equivalent to looping over node.children
+  /// equivalent to looping over `.children``
+  /// Bugs: doesn't play nice with continue, break, etc. If you need to use those, just `foreach` over `children`
   int opApply(int delegate(Node) dg);
   /// Gets the key of an assignment
   string key(); 
@@ -64,7 +65,14 @@ interface Node {
   final Block block() {
     return value!Block;
   }
+  /// Converts a node to a string that should be readable by the game
   string toString();
+  string toString(string indent);
+}
+
+/// Detects whether a variant is a Node or a descendant type
+bool isNode(Variant v) {
+  return v.peek!Node !is null || v.peek!Assignment !is null || v.peek!Block !is null || v.peek!Value !is null;
 }
 
 /// Two values seperated by an equals. Usually an effect or condition
@@ -77,6 +85,9 @@ class Assignment : Node {
     this._key = k;
     this._value = v;
   }
+  static Assignment opCall(T)(string k, T v) {
+    return new Assignment(k, cast(Variant)v);
+  }
 
   Node[] children() {
     throw new PDXInvalidTypeException;
@@ -85,10 +96,10 @@ class Assignment : Node {
     return NodeType.ASSIGNMENT;
   }
   Node opIndex(size_t i) {
-    throw new PDXInvalidTypeException;
+    return block[i];
   }
   Node opIndex(string s) {
-    throw new PDXInvalidTypeException;
+    return block[s];
   }
   int opApply(int delegate(Node) dg) {
     throw new PDXInvalidTypeException;
@@ -100,7 +111,12 @@ class Assignment : Node {
     return _value;
   }
   override string toString() {
-    return _key~" = "~_value.toString();
+    return toString("");
+  }
+  string toString(string indent) {
+    if(_value.isNode)
+      return indent~_key~" = "~_value.get!Node.toString(indent);
+    return indent~_key~" = "~_value.toString();
   }
 }
 
@@ -109,6 +125,9 @@ class Block : Node {
   Node[] _children;
   this(Node[] children) {
     _children = children;
+  }
+  static Block opCall(Node[] children) {
+    return new Block(children);
   }
 
   Node[] children() {
@@ -143,12 +162,15 @@ class Block : Node {
     throw new PDXInvalidTypeException;
   }
   override string toString() {
+    return toString("");
+  }
+  string toString(string indent) {
     auto ap = appender!string;
     ap.put("{\n");
-    foreach(child; this) {
-      ap.put(child.toString()~"\n");
+    foreach(child; _children) {
+      ap.put(child.toString(indent~"  ")~"\n");
     }
-    ap.put("\n}");
+    ap.put(indent~"}");
     return ap[];
   }
 }
@@ -158,6 +180,9 @@ class Value : Node {
   Variant _value;
   this(Variant v) {
     _value = v;
+  }
+  static Value opCall(T)(T v) {
+    return new Value(cast(Variant)v);
   }
 
   Node[] children() {
@@ -182,7 +207,12 @@ class Value : Node {
     return _value;
   }
   override string toString() {
-    return _value.toString();
+    return toString("");
+  }
+  string toString(string indent) {
+    if(_value.isNode)
+      return (_value.get!Node).toString(indent);
+    return indent~_value.toString();
   }
 }
 
@@ -309,6 +339,19 @@ Node parseFromFile(string filename) {
   }
 }
 
+/// Saves a node to a string. Different from `Node.toString()`` because it cuts off leading and trailing {}. Use this instead of `Node.toString()` if you want to save a modified node
+string saveNode(Node n) {
+  if(Block b = cast(Block)n)
+    return b.toString()[2..$-1];
+  return n.toString(); 
+}
+
+/// Same as `saveNode()` except it saves it to a file
+void saveNodeToFile(string filename, Node n) {
+  import std.file;
+  write(filename, n.saveNode);
+}
+
 unittest {
   string albania = `government = monarchy
 add_government_reform = autocracy_reform
@@ -338,9 +381,9 @@ capital = 4175 # Lezhe
   assert(res[0].value!string == "monarchy");
   assert(res[2].value!int == 1);
   assert(res[7].key == "1443.3.4");
-  assert(res[7].block[1].key == "clear_scripted_personalities");
-  assert(res[7].block[0].block[1].value!string == "Kastrioti");
-  assert(res[7].block[0].block[2].value!string != "aaa");
+  assert(res[7][1].key == "clear_scripted_personalities");
+  assert(res[7][0][1].value!string == "Kastrioti");
+  assert(res[7][0][2].value!string != "aaa");
 }
 
 unittest {
@@ -392,5 +435,24 @@ country_event = {
 }`; // From EU4: events/Catholic.txt
   auto tree = parse(file);
   assert(tree.children.length == 1);
-  assert(tree[0].block["id"].value!string == "catholic_flavor.2");
+  assert(tree[0]["id"].value!string == "catholic_flavor.2");
+}
+
+unittest {
+  import std.file;
+  auto n = Block([
+    Assignment("hello", "world"),
+    Assignment("block", Block([
+      Assignment("x", 1),
+      Assignment("y", 2)
+    ]))
+  ]);
+  saveNodeToFile("tmp.txt", n);
+  auto r = parseFromFile("tmp.txt");
+  assert(r[0].key == "hello");
+  assert(r[0].value!string == "world");
+  assert(r[1].key == "block");
+  assert(r[1]["x"].value!int == 1);
+  assert(r[1]["y"].value!int == 2);
+  remove("tmp.txt");
 }
