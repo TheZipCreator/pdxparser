@@ -65,6 +65,8 @@ interface Node {
   final Block block() {
     return value!Block;
   }
+  /// Adds a node to a block
+  void add(Node b); // TODO: this *maybe* could be operator overloaded
   /// Converts a node to a string that should be readable by the game
   string toString();
   string toString(string indent);
@@ -110,13 +112,21 @@ class Assignment : Node {
   Variant value_() {
     return _value;
   }
+  void add(Node b) {
+    throw new PDXInvalidTypeException;
+  }
   override string toString() {
     return toString("");
   }
   string toString(string indent) {
+    string v;
     if(_value.isNode)
-      return indent~_key~" = "~_value.get!Node.toString(indent);
-    return indent~_key~" = "~_value.toString();
+      v = _value.get!Node.toString(indent);
+    else if(_value.peek!bool !is null)
+      v = _value.get!bool ? "yes" : "no";
+    else
+      v = _value.toString();
+    return indent~_key~" = "~v;
   }
 }
 
@@ -161,6 +171,9 @@ class Block : Node {
   Variant value_() {
     throw new PDXInvalidTypeException;
   }
+  void add(Node b) {
+    _children ~= b;
+  }
   override string toString() {
     return toString("");
   }
@@ -203,6 +216,9 @@ class Value : Node {
   string key() {
     throw new PDXInvalidTypeException;
   }
+  void add(Node b) {
+    throw new PDXInvalidTypeException;
+  }
   Variant value_() {
     return _value;
   }
@@ -212,6 +228,8 @@ class Value : Node {
   string toString(string indent) {
     if(_value.isNode)
       return (_value.get!Node).toString(indent);
+    else if(_value.peek!bool !is null)
+      return indent~(_value.get!bool ? "yes" : "no");
     return indent~_value.toString();
   }
 }
@@ -231,6 +249,7 @@ Block parse(string script, int* l) {
     // test whether it's a number
     bool number = true;
     bool dot = false;
+    if(value[0] == '-') value = value[1..$];
     foreach(char c; value) {
       if(c == '.') {
         if(dot) {
