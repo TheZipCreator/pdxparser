@@ -67,6 +67,16 @@ interface Node {
   }
   /// Adds a node to a block
   void add(Node b); // TODO: this *maybe* could be operator overloaded
+  /// Tests both the key and value of an assignment
+  bool equals(T)(string k, T v) {
+    if(k != key)
+      return false;
+    if(value_.peek!T is null)
+      return false;
+    if(value!T != v)
+      return false;
+    return true;
+  }
   /// Converts a node to a string that should be readable by the game
   string toString();
   string toString(string indent);
@@ -474,4 +484,10 @@ unittest {
   assert(r[1]["x"].value!int == 1);
   assert(r[1]["y"].value!int == 2);
   remove("tmp.txt");
+}
+
+unittest {
+  string pair = `abc = 123`;
+  auto tree = parse(pair);
+  assert(tree[0].equals("abc", 123));
 }
